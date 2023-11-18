@@ -1,0 +1,6 @@
+tqdm
+numpy
+opencv-python
+pytorch
+torchvision
+nvdiffrast
