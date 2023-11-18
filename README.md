@@ -52,7 +52,7 @@ Only unlit rendering is supported. For the renderer implemented in this project,
 ```
 
 ## Speed
-For the given sample, in RTX 3070 each optimization step costs less than one minite.
+For the given sample, in RTX 3070 each optimization step costs less than one minute.
 
 
 ## TODOs
