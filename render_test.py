@@ -32,7 +32,7 @@ if __name__ == '__main__':
     renderer.set_camera_extrinsic(extrinsic)
 
     mask, depth, image = renderer(mesh)
-    image = image[0].cpu().numpy()
+    image = image[0].cpu().numpy() * 255
     depth = depth[0].cpu().numpy()
     cv2.imwrite('nv_color.png', image.astype(np.uint8))
     cv2.imwrite('nv_depth.png', (depth * 10000).astype(np.ushort))
