@@ -2,6 +2,9 @@
 
 __PME (Paint Mesh Editing) project__ is aim to deform mesh with 2D image guidance.
 
+## Update
+* 2023.11.19 adjust render util format for rendering normal map and more in the future, add normal map constraints
+
 ## Overview
 When we have a mesh, and we paint some part of this mesh into a color (or we call label). With such color label, we can render the mesh and find the rendered label in 2D image. Finally, we use the same color (label) to edit the 2D rendered image, with PME we could adjust the origin mesh easily!
 
@@ -46,7 +49,8 @@ Only unlit rendering is supported. For the renderer implemented in this project,
     renderer.set_camera_intrinsic(intrinsic)
     renderer.set_camera_extrinsic(extrinsic)
 
-    mask, depth, image = renderer(mesh)
+    # color, mask, depth, normal ...
+    render_result = renderer(mesh)
 
 
 ```

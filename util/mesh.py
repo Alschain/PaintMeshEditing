@@ -17,6 +17,7 @@ class Mesh:
         self.vts = vts
         self.vcs = vcs
         
+        self.f_ns = None
         self.f_v_idx = f_v_idx
         self.f_vt_idx = f_vt_idx if f_vt_idx is not None else f_v_idx
         self.f_vn_idx = f_vn_idx if f_vn_idx is not None else f_v_idx
@@ -37,7 +38,9 @@ class Mesh:
         if self.vcs is not None:
             out.vcs = self.vcs.clone()
 
-        
+
+        if self.f_ns is not None:
+            out.f_ns = self.f_ns.clone()        
         if self.f_v_idx is not None:
             out.f_v_idx = self.f_v_idx.clone()
         if self.f_vt_idx is not None:
@@ -55,3 +58,6 @@ class Mesh:
     
     def update_vs(self, vs):
         self.vs = vs
+
+    def update_normal(self):
+        self.vns, self.f_ns = compute_normals(self.vs, self.f_v_idx)

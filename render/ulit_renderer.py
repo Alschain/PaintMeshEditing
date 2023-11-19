@@ -18,11 +18,13 @@ class NvdiffrastMeshUlitRenderer(nn.Module):
         self.ndc_proj = None
 
 
-    def forward(self, mesh, antialias=True):
+    def forward(self, mesh, antialias=True, render_normal=False):
+        out = {}
+
         if self.ndc_proj is None:
             self.calc_ndc_projection()
         if self.glctx is None:
-            self.glctx = dr.RasterizeGLContext() if 'opengl' != self.args['rastype'] else dr.RasterizeCudaContext()
+            self.glctx = dr.RasterizeGLContext() if 'opengl' == self.args['rastype'] else dr.RasterizeCudaContext()
 
         if mesh.vs.shape[-1] == 3:
             vertex = torch.cat([mesh.vs, torch.ones([mesh.vs.shape[0], 1]).to(self.device)], dim=-1).unsqueeze(0)
@@ -44,12 +46,22 @@ class NvdiffrastMeshUlitRenderer(nn.Module):
             img = dr.texture(mesh.tex.unsqueeze(0), interp_out, inpterp_out_db)
             img = img * mask
 
+        if render_normal:
+            mesh.update_normal()
+
+            interp_out, inter_out_db = dr.interpolate(mesh.vns.contiguous(), rast_out, mesh.f_vn_idx, rast_db, diff_attrs='all')
+            out['normal'] = interp_out * mask
+
         depth = self.calc_ndc_to_depth(ndc_depth)
         depth = mask * depth
         if antialias:
             img = dr.antialias(img.contiguous(), rast_out, vertex_ndc.contiguous(), mesh.f_v_idx.int())
         
-        return mask, depth, img
+        out['mask'] = mask
+        out['depth'] = depth
+        out['color'] = img
+
+        return out
 
     def set_camera_intrinsic(self, intrinsic):
         if type(intrinsic) == np.ndarray:

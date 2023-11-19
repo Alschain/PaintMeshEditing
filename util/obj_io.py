@@ -67,6 +67,7 @@ def load_obj(obj_path, tex_path=None, device='cuda'):
 
 def save_obj(obj_path, mesh):
     parent_dir = os.path.dirname(obj_path)
+    os.makedirs(parent_dir, exist_ok=True)
     obj_name = os.path.basename(obj_path).split('.')[0]
     print("Writing mesh: ", obj_path)
     with open(obj_path, "w") as f:
