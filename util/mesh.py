@@ -115,13 +115,13 @@ class MeshWithBlendShapes():
     def set_bs_trainable(self):
         for key in self.trainable_parameters.keys():
             if key is not None:
-                self.trainable_parameters[key].requires_grad_ = True
+                self.trainable_parameters[key].requires_grad_(True)
         return
     
     def set_bs_untrainable(self):
         for key in self.trainable_parameters.keys():
             if key is not None:
-                self.trainable_parameters[key].requires_grad_ = False
+                self.trainable_parameters[key].requires_grad_(False)
         return
 
     def clone(self):
