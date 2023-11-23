@@ -166,8 +166,20 @@ def save_obj(obj_path, mesh):
         print("    writing %d faces" % len(f_v_idx))
         for i in range(len(f_v_idx)):
             f.write("f ")
-            for j in range(3):
-                f.write(' %s/%s/%s' % (str(f_v_idx[i][j]+1), '' if vts is None else str(f_vt_idx[i][j]+1), '' if vns is None else str(f_vn_idx[i][j]+1)))
+            if vts is not None and vns is not None:
+                for j in range(3):
+                    f.write(' %s/%s/%s' % (str(f_v_idx[i][j]+1), str(f_vt_idx[i][j]+1), str(f_vn_idx[i][j]+1)))
+            elif vts is not None and vns is None:
+                for j in range(3):
+                    f.write(' %s/%s' % (str(f_v_idx[i][j]+1), str(f_vt_idx[i][j]+1)))
+            elif vns is not None and vts is None:
+                for j in range(3):
+                    f.write(' %s/%s' % (str(f_v_idx[i][j]+1), str(f_vn_idx[i][j]+1)))
+            else:
+                for j in range(3):
+                    f.write(' %s' % (str(f_v_idx[i][j]+1)))
+
+            
             f.write("\n")
 
     if mesh.tex is not None:
