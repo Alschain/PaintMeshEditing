@@ -55,6 +55,7 @@ class Mesh:
             out.edges = self.edges.clone()
         if self.connected_faces is not None:
             out.connected_faces = self.connected_faces.clone()
+        return out
     
     def update_vs(self, vs):
         self.vs = vs
