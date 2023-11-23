@@ -26,40 +26,104 @@ def load_obj(obj_path, tex_path=None, device='cuda'):
         elif prefix == 'vn':
             vert_normals.append([float(v) for v in line.split()[1:]])
 
+    uv = False if len(uvs) == 0 else True
+    nor = False if len(vert_normals) == 0 else True
+
     # load faces
     f_v_idx, f_vt_idx, f_vn_idx = [], [], []
-    for line in lines:
-        if len(line.split()) == 0:
-            continue
-        prefix = line.split()[0].lower()
-        if prefix == 'f':
-            vs = line.split()[1:]
-            nv = len(vs)
-            vv = vs[0].split('/')
-            v0 = int(vv[0]) - 1
-            t0 = int(vv[1]) - 1 if vv[1] != "" else -1
-            n0 = int(vv[2]) - 1 if vv[2] != "" else -1
-            for i in range(nv - 2):
-                vv = vs[i + 1].split('/')
-                v1 = int(vv[0]) - 1
-                t1 = int(vv[1]) - 1 if vv[1] != "" else -1
-                n1 = int(vv[2]) - 1 if vv[2] != "" else -1
-                vv = vs[i + 2].split('/')
-                v2 = int(vv[0]) - 1
-                t2 = int(vv[1]) - 1 if vv[1] != "" else -1
-                n2 = int(vv[2]) - 1 if vv[2] != "" else -1
-                f_v_idx.append([v0, v1, v2])
-                f_vt_idx.append([t0, t1, t2])
-                f_vn_idx.append([n0, n1, n2])
-    assert len(f_v_idx) == len(f_vt_idx) and len(f_v_idx) == len (f_vn_idx)
+
+    if uv and nor:
+        for line in lines:
+            if len(line.split()) == 0:
+                continue
+            prefix = line.split()[0].lower()
+            if prefix == 'f':
+                vs = line.split()[1:]
+                nv = len(vs)
+                vv = vs[0].split('/')
+                v0 = int(vv[0]) - 1
+                t0 = int(vv[1]) - 1 if vv[1] != "" else -1
+                n0 = int(vv[2]) - 1 if vv[2] != "" else -1
+                for i in range(nv - 2):
+                    vv = vs[i + 1].split('/')
+                    v1 = int(vv[0]) - 1
+                    t1 = int(vv[1]) - 1 if vv[1] != "" else -1
+                    n1 = int(vv[2]) - 1 if vv[2] != "" else -1
+                    vv = vs[i + 2].split('/')
+                    v2 = int(vv[0]) - 1
+                    t2 = int(vv[1]) - 1 if vv[1] != "" else -1
+                    n2 = int(vv[2]) - 1 if vv[2] != "" else -1
+                    f_v_idx.append([v0, v1, v2])
+                    f_vt_idx.append([t0, t1, t2])
+                    f_vn_idx.append([n0, n1, n2])
+        assert len(f_v_idx) == len(f_vt_idx) and len(f_v_idx) == len (f_vn_idx)
+    elif uv:
+        for line in lines:
+            if len(line.split()) == 0:
+                continue
+            prefix = line.split()[0].lower()
+            if prefix == 'f':
+                vs = line.split()[1:]
+                nv = len(vs)
+                vv = vs[0].split('/')
+                v0 = int(vv[0]) - 1
+                t0 = int(vv[1]) - 1 if vv[1] != "" else -1
+                for i in range(nv - 2):
+                    vv = vs[i + 1].split('/')
+                    v1 = int(vv[0]) - 1
+                    t1 = int(vv[1]) - 1 if vv[1] != "" else -1
+                    vv = vs[i + 2].split('/')
+                    v2 = int(vv[0]) - 1
+                    t2 = int(vv[1]) - 1 if vv[1] != "" else -1
+                    f_v_idx.append([v0, v1, v2])
+                    f_vt_idx.append([t0, t1, t2])
+        assert len(f_v_idx) == len(f_vt_idx)
+    elif nor:
+        for line in lines:
+            if len(line.split()) == 0:
+                continue
+            prefix = line.split()[0].lower()
+            if prefix == 'f':
+                vs = line.split()[1:]
+                nv = len(vs)
+                vv = vs[0].split('/')
+                v0 = int(vv[0]) - 1
+                n0 = int(vv[1]) - 1 if vv[1] != "" else -1
+                for i in range(nv - 2):
+                    vv = vs[i + 1].split('/')
+                    v1 = int(vv[0]) - 1
+                    n1 = int(vv[1]) - 1 if vv[1] != "" else -1
+                    vv = vs[i + 2].split('/')
+                    v2 = int(vv[0]) - 1
+                    n2 = int(vv[1]) - 1 if vv[1] != "" else -1
+                    f_v_idx.append([v0, v1, v2])
+                    f_vn_idx.append([n0, n1, n2])
+        assert len(f_v_idx) == len (f_vn_idx)
+    else:
+        for line in lines:
+            if len(line.split()) == 0:
+                continue
+            prefix = line.split()[0].lower()
+            if prefix == 'f':
+                vs = line.split()[1:]
+                nv = len(vs)
+                vv = vs[0].split('/')
+                v0 = int(vv[0]) - 1
+                for i in range(nv - 2):
+                    vv = vs[i + 1].split('/')
+                    v1 = int(vv[0]) - 1
+                    vv = vs[i + 2].split('/')
+                    v2 = int(vv[0]) - 1
+                    f_v_idx.append([v0, v1, v2])
+
 
     verts = torch.tensor(verts, dtype=torch.float32, device=device)
     uvs = torch.tensor(uvs, dtype=torch.float32, device=device) if len(uvs) > 0 else None
     vert_normals = torch.tensor(vert_normals, dtype=torch.float32, device=device) if len(vert_normals) > 0 else None
     
     f_v_idx = torch.tensor(f_v_idx, dtype=torch.int32, device=device).contiguous()
-    f_vt_idx = torch.tensor(f_vt_idx, dtype=torch.int32, device=device).contiguous() if f_vt_idx is not None else None
-    f_vn_idx = torch.tensor(f_vn_idx, dtype=torch.int32, device=device).contiguous() if f_vn_idx is not None else None
+    f_vt_idx = torch.tensor(f_vt_idx, dtype=torch.int32, device=device).contiguous() if len(f_vt_idx) != 0 else None
+    f_vn_idx = torch.tensor(f_vn_idx, dtype=torch.int32, device=device).contiguous() if len(f_vn_idx) != 0 else None
 
     texture = torch.tensor(cv2.imread(tex_path, -1)[...,:3], dtype=torch.float32, device=device).contiguous() / 255. if tex_path is not None else None
 
@@ -85,14 +149,14 @@ def save_obj(obj_path, mesh):
         for v in vs:
             f.write('v {} {} {} \n'.format(v[0], v[1], v[2]))
        
-        print("    writing %d texcoords" % len(vts))
         if vts is not None:
+            print("    writing %d texcoords" % len(vts))
             assert(len(f_v_idx) == len(f_vt_idx))
             for v in vts:
                 f.write('vt {} {} \n'.format(v[0], 1.0 - v[1]))
 
-        print("    writing %d normals" % len(vns))
         if vns is not None:
+            print("    writing %d normals" % len(vns))
             assert(len(f_v_idx) == len(f_vn_idx))
             for v in vns:
                 f.write('vn {} {} {}\n'.format(v[0], v[1], v[2]))
