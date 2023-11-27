@@ -45,6 +45,8 @@ class NvdiffrastMeshUlitRenderer(nn.Module):
                 
             img = dr.texture(mesh.tex.unsqueeze(0), interp_out, inpterp_out_db)
             img = img * mask
+            if antialias:
+                img = dr.antialias(img.contiguous(), rast_out, vertex_ndc.contiguous(), mesh.f_v_idx.int())
 
         if render_normal:
             mesh.update_normal()
@@ -54,8 +56,6 @@ class NvdiffrastMeshUlitRenderer(nn.Module):
 
         depth = self.calc_ndc_to_depth(ndc_depth)
         depth = mask * depth
-        if antialias:
-            img = dr.antialias(img.contiguous(), rast_out, vertex_ndc.contiguous(), mesh.f_v_idx.int())
         
         out['mask'] = mask
         out['depth'] = depth
