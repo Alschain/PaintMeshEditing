@@ -47,7 +47,7 @@ def load_obj(obj_path, tex_path=None, device='cuda'):
 
     num_v, num_vt, num_vn = len(verts), len(uvs), len(vert_normals)
 
-    # load faces
+    # load faces (handles f v, f v/vt, f v//vn, f v/vt/vn, and negative indices)
     f_v_idx, f_vt_idx, f_vn_idx = [], [], []
     has_vt_idx, has_vn_idx = False, False
     for line in lines:
@@ -90,6 +90,7 @@ def load_obj(obj_path, tex_path=None, device='cuda'):
 
     return Mesh(vs=verts, vns=vert_normals, vts=uvs, vcs=None, f_v_idx=f_v_idx, f_vt_idx=f_vt_idx, f_vn_idx=f_vn_idx, tex=texture)
 
+
 def save_obj(obj_path, mesh):
     parent_dir = os.path.dirname(obj_path)
     if parent_dir:
@@ -127,14 +128,23 @@ def save_obj(obj_path, mesh):
                 f.write('vn {} {} {}\n'.format(v[0], v[1], v[2]))
 
         # Write faces
+        has_vt = vts is not None and f_vt_idx is not None
+        has_vn = vns is not None and f_vn_idx is not None
         print("    writing %d faces" % len(f_v_idx))
         for i in range(len(f_v_idx)):
             f.write("f ")
-            for j in range(3):
-                v_str = str(int(f_v_idx[i][j]) + 1)
-                vt_str = '' if (vts is None or f_vt_idx is None) else str(int(f_vt_idx[i][j]) + 1)
-                vn_str = '' if (vns is None or f_vn_idx is None) else str(int(f_vn_idx[i][j]) + 1)
-                f.write(' %s/%s/%s' % (v_str, vt_str, vn_str))
+            if has_vt and has_vn:
+                for j in range(3):
+                    f.write(' %d/%d/%d' % (int(f_v_idx[i][j]) + 1, int(f_vt_idx[i][j]) + 1, int(f_vn_idx[i][j]) + 1))
+            elif has_vt:
+                for j in range(3):
+                    f.write(' %d/%d' % (int(f_v_idx[i][j]) + 1, int(f_vt_idx[i][j]) + 1))
+            elif has_vn:
+                for j in range(3):
+                    f.write(' %d//%d' % (int(f_v_idx[i][j]) + 1, int(f_vn_idx[i][j]) + 1))
+            else:
+                for j in range(3):
+                    f.write(' %d' % (int(f_v_idx[i][j]) + 1))
             f.write("\n")
 
     if mesh.tex is not None:
