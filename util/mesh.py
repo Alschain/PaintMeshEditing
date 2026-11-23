@@ -55,9 +55,11 @@ class Mesh:
             out.edges = self.edges.clone()
         if self.connected_faces is not None:
             out.connected_faces = self.connected_faces.clone()
+        return out
     
     def update_vs(self, vs):
         self.vs = vs
 
     def update_normal(self):
         self.vns, self.f_ns = compute_normals(self.vs, self.f_v_idx)
+        self.f_vn_idx = self.f_v_idx

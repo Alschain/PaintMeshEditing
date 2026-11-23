@@ -1,6 +1,12 @@
 tqdm
 numpy
 opencv-python
-pytorch
+Pillow
+torch
 torchvision
 nvdiffrast
+
+# Optional: for local HuggingFace Diffusers 2D AI image editing backends
+# diffusers
+# transformers
+# accelerate

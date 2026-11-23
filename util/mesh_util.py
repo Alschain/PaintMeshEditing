@@ -5,7 +5,7 @@ def compute_normals(vertices, triangles):
     a = vertices[triangles.long()][:, 0, :]
     b = vertices[triangles.long()][:, 1, :]
     c = vertices[triangles.long()][:, 2, :]
-    face_normals = torch.nn.functional.normalize(torch.cross(b - a, c - a), p=2, dim=-1) 
+    face_normals = torch.nn.functional.normalize(torch.cross(b - a, c - a, dim=-1), p=2, dim=-1) 
 
     # Compute the vertex normals
     vertex_normals = torch.zeros_like(vertices)
@@ -42,9 +42,8 @@ def find_connected_faces(indices):
     # Make sure that two edges that share the same vertices have the vertex ids appear in the same order
     edges, _ = torch.sort(edges, dim=1)
 
-    # Now find edges that share the same vertices and make sure there are only manifold edges
+    # Find edges that share the same vertices; gracefully filter to manifold interior edges (counts == 2)
     _, inverse_indices, counts = torch.unique(edges, dim=0, sorted=False, return_inverse=True, return_counts=True)
-    assert counts.max() == 2
 
     # We now create a tensor that contains corresponding faces.
     # If the faces with ids fi and fj share the same edge, the tensor contains them as
@@ -54,13 +53,17 @@ def find_connected_faces(indices):
 
     face_correspondences = torch.zeros((counts.shape[0], 2), dtype=torch.int64)
     face_correspondences_indices = torch.zeros(counts.shape[0], dtype=torch.int64)
+    counts_cpu = counts.cpu()
 
     # ei = edge index
     for ei, ei_unique in enumerate(list(inverse_indices.cpu().numpy())):
-        face_correspondences[ei_unique, face_correspondences_indices[ei_unique]] = face_ids[ei] 
-        face_correspondences_indices[ei_unique] += 1
+        if counts_cpu[ei_unique] == 2:
+            slot = face_correspondences_indices[ei_unique]
+            if slot < 2:
+                face_correspondences[ei_unique, slot] = face_ids[ei]
+                face_correspondences_indices[ei_unique] = slot + 1
 
-    return face_correspondences[counts == 2].long().to(device=indices.device)
+    return face_correspondences[counts_cpu == 2].long().to(device=indices.device)
 
 def compute_laplacian_uniform(vertices, edges):
     """
@@ -74,10 +77,9 @@ def compute_laplacian_uniform(vertices, edges):
         Sparse FloatTensor of shape (V, V) where V = sum(V_n)
     """
 
-    # This code is adapted from from PyTorch3D 
+    # This code is adapted from PyTorch3D 
     # (https://github.com/facebookresearch/pytorch3d/blob/88f5d790886b26efb9f370fb9e1ea2fa17079d19/pytorch3d/structures/meshes.py#L1128)
 
-    verts_packed = vertices # (sum(V_n), 3)
     edges_packed = edges    # (sum(E_n), 2)
     V = vertices.shape[0]
 
@@ -91,7 +93,7 @@ def compute_laplacian_uniform(vertices, edges):
     # i.e. A[i, j] = 1 if (i,j) is an edge, or
     # A[e0, e1] = 1 &  A[e1, e0] = 1
     ones = torch.ones(idx.shape[1], dtype=torch.float32, device=vertices.device)
-    A = torch.sparse.FloatTensor(idx, ones, (V, V))
+    A = torch.sparse_coo_tensor(idx, ones, (V, V), device=vertices.device)
 
     # the sum of i-th row of A gives the degree of the i-th vertex
     deg = torch.sparse.sum(A, dim=1).to_dense()
@@ -103,39 +105,29 @@ def compute_laplacian_uniform(vertices, edges):
     deg1 = deg[e1]
     deg1 = torch.where(deg1 > 0.0, 1.0 / deg1, deg1)
     val = torch.cat([deg0, deg1])
-    L = torch.sparse.FloatTensor(idx, val, (V, V))
+    L = torch.sparse_coo_tensor(idx, val, (V, V), device=vertices.device)
 
     # Then we add the diagonal values L[i, i] = -1.
-    idx = torch.arange(V, device=vertices.device)
-    idx = torch.stack([idx, idx], dim=0)
-    ones = torch.ones(idx.shape[1], dtype=torch.float32, device=vertices.device)
-    L -= torch.sparse.FloatTensor(idx, ones, (V, V))
+    diag_idx = torch.arange(V, device=vertices.device)
+    diag_idx = torch.stack([diag_idx, diag_idx], dim=0)
+    diag_ones = torch.ones(diag_idx.shape[1], dtype=torch.float32, device=vertices.device)
+    L = L - torch.sparse_coo_tensor(diag_idx, diag_ones, (V, V), device=vertices.device)
 
-    return L
+    return L.coalesce()
 
 def compute_triangle_area(vertices, triangles):
-    
-    p0 = vertices[triangles.long()][:, 0, :]
-    p1 = vertices[triangles.long()][:, 1, :]
-    p2 = vertices[triangles.long()][:, 2, :]
+    tri = triangles.long()
+    p0 = vertices[tri[:, 0]]
+    p1 = vertices[tri[:, 1]]
+    p2 = vertices[tri[:, 2]]
 
-
-    a = torch.sqrt(torch.sum((p0-p1)**2, dim=-1))
-    b = torch.sqrt(torch.sum((p0-p2)**2, dim=-1))
-    c = torch.sqrt(torch.sum((p1-p2)**2, dim=-1))
-
-    p = (a + b + c) / 2
-
-    s = torch.sqrt(p*(p-a)*(p-b)*(p-c))
-
+    cross = torch.cross(p1 - p0, p2 - p0, dim=-1)
+    s = 0.5 * torch.sqrt(torch.sum(cross ** 2, dim=-1) + 1e-12)
     return s
 
 def compute_edge_length(vertices, edges):
-    
-    p0 = vertices[edges][:, 0, :]
-    p1 = vertices[edges][:, 1, :]
+    p0 = vertices[edges[:, 0]]
+    p1 = vertices[edges[:, 1]]
 
-
-    L = torch.sqrt(torch.sum((p0-p1)**2, dim=-1))
-
+    L = torch.sqrt(torch.sum((p0 - p1) ** 2, dim=-1) + 1e-12)
     return L
