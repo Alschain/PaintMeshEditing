@@ -115,6 +115,7 @@ class PaintMeshEditingApp(tk.Tk):
         self.intrinsic = None
         self.extrinsic = None
         self.base_extrinsic = None
+        self.last_render_fg_mask = None
         self.normal_target = None
         self.depth_target = None
         self.silhouette_target = None
@@ -996,7 +997,7 @@ class PaintMeshEditingApp(tk.Tk):
         self.base_extrinsic = None
         self.clear_multiview_list(silent=True)
         self.log(f"Loaded preset paths: {preset_name}")
-        self.render_current_view(load_existing_guidance=True, reload_3d=True)
+        self.render_current_view(load_existing_guidance=True, reload_3d=True, camera_changed=True)
 
     def _ensure_camera_loaded(self):
         intr_path = self.var_intr_path.get().strip()
@@ -1033,14 +1034,14 @@ class PaintMeshEditingApp(tk.Tk):
         if abs(dz) > 1e-6:
             self.extrinsic[2, 3] += float(dz)
 
-        self.render_current_view(load_existing_guidance=False)
+        self.render_current_view(load_existing_guidance=False, camera_changed=True)
 
     def _reset_camera(self):
         if self.base_extrinsic is not None:
             self.extrinsic = self.base_extrinsic.copy()
-            self.render_current_view(load_existing_guidance=False)
+            self.render_current_view(load_existing_guidance=False, camera_changed=True)
 
-    def render_current_view(self, load_existing_guidance=False, reload_3d=False):
+    def render_current_view(self, load_existing_guidance=False, reload_3d=False, camera_changed=False):
         obj_path = self.var_mesh_path.get().strip()
         tex_path = self.var_tex_path.get().strip()
         if not obj_path or not os.path.exists(obj_path):
@@ -1075,13 +1076,34 @@ class PaintMeshEditingApp(tk.Tk):
             self.log(f"[Error] Render failed: {exc}")
             return
 
-        self.paint_canvas.set_rendered_image(res['color_bgr'], reset_label=True, fit=True)
+        self.last_render_fg_mask = res.get('mask_gray')
+        self.paint_canvas.set_rendered_image(
+            res['color_bgr'],
+            reset_label=True,
+            reset_mask=camera_changed,
+            fit=True,
+        )
         if 'normal' in res and res['normal'] is not None:
             self.paint_canvas.set_normal_vis(vis_normal_map(res['normal']))
         if 'depth' in res and res['depth'] is not None:
             self.paint_canvas.set_depth_vis(vis_depth_map(res['depth']))
         if 'mesh' in res:
             self.current_mesh = res['mesh']
+
+        # When camera viewpoint changes, clear stale view-specific guidance maps and
+        # project any direct 3D painted UV region accurately into the new 2D camera view.
+        if camera_changed and not load_existing_guidance:
+            self.normal_target = None
+            self.depth_target = None
+            self.silhouette_target = None
+            if hasattr(self, 'viewport3d') and self.viewport3d.has_3d_paint_edits():
+                proj_mask = self.viewport3d.project_3d_paint_mask(self.intrinsic, self.extrinsic, (h, w))
+                if proj_mask is not None:
+                    self.paint_canvas.set_mask_image(proj_mask, push_history=False)
+                    cov = 100.0 * float((proj_mask > 127).mean())
+                    self.log(f"Projected 3D painted region to new 2D mask ({cov:.2f}% of image).")
+            else:
+                self.log("Camera viewpoint changed: cleared previous view's 2D mask (paint or click 'Auto Mask' for this angle).")
 
         # Keep 3D Interactive Viewport synchronized with current mesh & camera
         if hasattr(self, 'viewport3d'):
@@ -1188,6 +1210,7 @@ class PaintMeshEditingApp(tk.Tk):
             color_tol=self.var_color_tol.get(),
             diff_thresh=self.var_diff_thresh.get(),
             dilate_px=self.var_dilate_px.get(),
+            fg_mask=self.last_render_fg_mask,
         )
         self.paint_canvas.set_mask_image(mask, push_history=True)
         coverage = 100.0 * float((mask > 127).mean())
@@ -1420,7 +1443,7 @@ class PaintMeshEditingApp(tk.Tk):
                 [0, 0, 0, 1],
             ], dtype=np.float32)
             self.extrinsic = base_e @ rot
-            self.render_current_view(load_existing_guidance=False)
+            self.render_current_view(load_existing_guidance=False, camera_changed=True)
             self.add_current_view_to_multiview(name=f"Yaw {deg:+.0f}°")
 
         # Restore base view
@@ -1435,7 +1458,7 @@ class PaintMeshEditingApp(tk.Tk):
             messagebox.showwarning("3D Viewport", "Load a mesh first.")
             return
         self.extrinsic = self.viewport3d.get_extrinsic()
-        self.render_current_view(load_existing_guidance=False)
+        self.render_current_view(load_existing_guidance=False, camera_changed=True)
         self.center_tabs.select(0)
         self.log("Synced 3D Arcball camera & live texture to 2D Paint view.")
 
@@ -1444,7 +1467,7 @@ class PaintMeshEditingApp(tk.Tk):
             messagebox.showwarning("3D Viewport", "Load a mesh first.")
             return
         self.extrinsic = self.viewport3d.get_extrinsic()
-        self.render_current_view(load_existing_guidance=False)
+        self.render_current_view(load_existing_guidance=False, camera_changed=True)
         self.add_current_view_to_multiview(name=f"3D Pose #{len(self.multiview_list) + 1}")
 
     def save_3d_painted_texture(self):

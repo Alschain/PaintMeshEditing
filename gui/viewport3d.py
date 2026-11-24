@@ -354,6 +354,37 @@ class Viewport3D(ttk.Frame):
         self._texture_dirty = False
         return path
 
+    def has_3d_paint_edits(self):
+        if self.tex_bgr is None or self.orig_tex_bgr is None:
+            return False
+        if self.tex_bgr.shape != self.orig_tex_bgr.shape:
+            return False
+        return bool(np.any(self.tex_bgr != self.orig_tex_bgr))
+
+    def project_3d_paint_mask(self, intrinsic, extrinsic, render_size):
+        """Project UV texels painted directly in 3D onto the given 2D camera viewpoint."""
+        if not self.has_3d_paint_edits() or self.verts is None or self.faces_v is None:
+            return None
+        uv_diff = np.any(self.tex_bgr != self.orig_tex_bgr, axis=-1)
+        mask_tex = np.where(uv_diff[..., None], 255, 0).astype(np.uint8)
+        mask_tex = np.repeat(mask_tex, 3, axis=-1)
+        res = rasterize_mesh_cpu(
+            verts=self.verts,
+            uvs=self.uvs,
+            faces_v=self.faces_v,
+            faces_vt=self.faces_vt,
+            tex_bgr=mask_tex,
+            intrinsic=intrinsic,
+            extrinsic=extrinsic,
+            render_size=render_size,
+            vns=self.vertex_normals,
+            fns=self.face_normals,
+            bg_color=(0, 0, 0),
+            shading='unlit',
+            antialias=False,
+        )
+        return np.where(res['color_bgr'][..., 0] > 127, 255, 0).astype(np.uint8)
+
     # ------------------------------------------------------------------
     # Modes & Undo/Redo
     # ------------------------------------------------------------------

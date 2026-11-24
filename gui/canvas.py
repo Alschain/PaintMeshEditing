@@ -92,12 +92,12 @@ class PaintCanvas(ttk.Frame):
     # Data setters
     # ------------------------------------------------------------------
 
-    def set_rendered_image(self, img_bgr, reset_label=True, fit=True):
+    def set_rendered_image(self, img_bgr, reset_label=True, reset_mask=False, fit=True):
         self.rendered_bgr = img_bgr.copy()
         h, w = img_bgr.shape[:2]
         if reset_label or self.label_bgr is None or self.label_bgr.shape[:2] != (h, w):
             self.label_bgr = img_bgr.copy()
-        if self.mask_gray is None or self.mask_gray.shape[:2] != (h, w):
+        if reset_mask or self.mask_gray is None or self.mask_gray.shape[:2] != (h, w):
             self.mask_gray = np.zeros((h, w), dtype=np.uint8)
         self._undo_stack.clear()
         self._redo_stack.clear()

@@ -43,13 +43,14 @@ def compute_edit_mask(
     color_tol=40,
     diff_thresh=15,
     dilate_px=5,
+    fg_mask=None,
 ):
     """Automatically compute the PME optimization mask (uint8, 0 or 255).
 
     Following the PME workflow, the mask is the union of:
       1. Pixels that changed between the rendered image and the edited target image
       2. Optional user-painted mask strokes
-      3. Optional label-colored pixels in BOTH the original render and the edited image
+      3. Optional label-colored pixels in BOTH the original render (within foreground) and the edited image
     """
     h, w = edited_bgr.shape[:2]
     mask = np.zeros((h, w), dtype=np.uint8)
@@ -69,11 +70,32 @@ def compute_edit_mask(
     if label_color_bgr is not None:
         target = np.array(label_color_bgr, dtype=np.int16).reshape(1, 1, 3)
         tol = int(color_tol)
+        fg_bool = None
+        if fg_mask is not None:
+            fm = fg_mask[..., 0] if fg_mask.ndim == 3 else fg_mask
+            if fm.shape[:2] != (h, w):
+                fm = cv2.resize(fm, (w, h), interpolation=cv2.INTER_NEAREST)
+            fg_bool = fm > 127
+
         if rendered_bgr is not None and rendered_bgr.shape[:2] == (h, w):
             dist_r = np.abs(rendered_bgr.astype(np.int16) - target).max(axis=-1)
-            mask[dist_r <= tol] = 255
+            match_r = dist_r <= tol
+            if fg_bool is not None:
+                match_r = match_r & fg_bool
+            elif int(target.max()) <= tol:
+                # Avoid matching pure-black background when no explicit fg_mask is provided
+                match_r = match_r & (rendered_bgr.max(axis=-1) > 0)
+            mask[match_r] = 255
+
         dist_e = np.abs(edited_bgr.astype(np.int16) - target).max(axis=-1)
-        mask[dist_e <= tol] = 255
+        match_e = dist_e <= tol
+        if int(target.max()) <= tol:
+            # For dark label colors, only match edited pixels that differ from background or lie in foreground
+            if fg_bool is not None:
+                match_e = match_e & fg_bool
+            else:
+                match_e = match_e & (edited_bgr.max(axis=-1) > 0)
+        mask[match_e] = 255
 
     # Clean noise and dilate boundary slightly so differentiable renderer has smooth support
     if dilate_px and int(dilate_px) > 0:
